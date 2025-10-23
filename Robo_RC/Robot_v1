@@ -1,6 +1,6 @@
 //                                                  Futbol Sumo 2025
 //                                            ESP32 - TB6612FNG - 7.4v
-
+//https://drive.google.com/file/d/1CYoi0FDiDO9pIqIt3slnam1ad3I-gfZz/view?usp=drivesdk
 #include "BluetoothSerial.h"
 BluetoothSerial SerialBT;
 
