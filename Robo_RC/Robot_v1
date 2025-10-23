@@ -1,0 +1,188 @@
+//                                                  Futbol Sumo 2025
+//                                            ESP32 - TB6612FNG - 7.4v
+
+#include "BluetoothSerial.h"
+BluetoothSerial SerialBT;
+
+// --- Definición de Pines ---
+#define AIN1 32
+#define AIN2 26
+#define BIN1 14
+#define BIN2 12
+#define PWMA 25 
+#define PWMB 13 
+#define STBY 27
+
+// --- Definición de LEDs ---
+#define LED_EXTERNAL 33   // LED controlado por 'W' y 'w'
+#define LED_BUILTIN 2     // LED integrado en la placa (indica conexión BT)
+
+// --- Configuración de PWM (Usando LEDC de ESP32) ---
+const int pwmFreq = 5000;
+const int pwmResolution = 8;
+// Los canales (pwmChannelA/B) no se definen explícitamente en esta versión antigua
+
+// --- Variables Globales ---
+int currentSpeed = 150;
+float turnFactor = 0.5;
+bool isBtConnected = false; 
+
+void setup() {
+  Serial.begin(115200);
+  SerialBT.begin("Los Tungtungsitos");
+
+  // Configurar pines de motor como SALIDA
+  pinMode(AIN1, OUTPUT);
+  pinMode(AIN2, OUTPUT);
+  pinMode(BIN1, OUTPUT);
+  pinMode(BIN2, OUTPUT);
+  pinMode(STBY, OUTPUT);
+  digitalWrite(STBY, HIGH); 
+
+  // Configurar pines de LED como SALIDA
+  pinMode(LED_EXTERNAL, OUTPUT);
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_EXTERNAL, LOW); 
+  digitalWrite(LED_BUILTIN, LOW);  
+
+  // Configurar los canales PWM (API ANTIGUA)
+  // No hay ledcSetup(). ledcAttach() hace todo.
+  ledcAttach(PWMA, pwmFreq, pwmResolution); // Asigna Pin, Frecuencia y Resolución
+  ledcAttach(PWMB, pwmFreq, pwmResolution); // Asigna Pin, Frecuencia y Resolución
+
+  Stop(); 
+}
+
+void loop() {
+  // --- Manejo del LED de conexión ---
+  if (SerialBT.hasClient()) {
+    if (!isBtConnected) {
+        Serial.println("Cliente Conectado");
+        digitalWrite(LED_BUILTIN, HIGH); 
+        isBtConnected = true;
+    }
+  } else {
+    if (isBtConnected) {
+        Serial.println("Cliente Desconectado");
+        digitalWrite(LED_BUILTIN, LOW);  
+        Stop(); // Parada de seguridad
+        isBtConnected = false;
+    }
+  }
+
+  // --- Lógica de Control ---
+  if (SerialBT.available()) {
+    char value = SerialBT.read();
+    Serial.println(value);
+
+    // 1. Control de Velocidad
+    if (value >= '0' && value <= '9') {
+      int speedNum = value - '0'; 
+      currentSpeed = map(speedNum, 0, 9, 0, 255);
+      Serial.print("Velocidad actualizada: ");
+      Serial.println(currentSpeed);
+    } 
+    else if (value == 'q') {
+      currentSpeed = 255;
+      Serial.print("Velocidad actualizada: ");
+      Serial.println(currentSpeed);
+    }
+    // 2. Control de LED Externo
+    else if (value == 'W') {
+      digitalWrite(LED_EXTERNAL, HIGH);
+    } 
+    else if (value == 'w') {
+      digitalWrite(LED_EXTERNAL, LOW);
+    }
+    // 3. Control de Movimiento
+    else {
+      switch (value) {
+        case 'F': Forward(); break;
+        case 'B': Backward(); break;
+        case 'S': Stop(); break;
+        case 'L': Left(); break;
+        case 'R': Right(); break;
+        case 'G': ForwardLeft(); break;
+        case 'I': ForwardRight(); break;
+        case 'H': BackLeft(); break;
+        case 'J': BackRight(); break;
+      }
+    }
+  }
+}
+
+// --- Funciones de Movimiento (Actualizadas) ---
+// ledcWrite() ahora usa el PIN (PWMA/PWMB) en lugar del canal
+
+void Forward() {
+  ledcWrite(PWMA, currentSpeed); // <-- CAMBIADO
+  ledcWrite(PWMB, currentSpeed); // <-- CAMBIADO
+  digitalWrite(AIN1, HIGH);
+  digitalWrite(AIN2, LOW);
+  digitalWrite(BIN1, HIGH);
+  digitalWrite(BIN2, LOW);
+}
+void Backward() {
+  ledcWrite(PWMA, currentSpeed); // <-- CAMBIADO
+  ledcWrite(PWMB, currentSpeed); // <-- CAMBIADO
+  digitalWrite(AIN1, LOW);
+  digitalWrite(AIN2, HIGH);
+  digitalWrite(BIN1, LOW);
+  digitalWrite(BIN2, HIGH);
+}
+void Stop() {
+  ledcWrite(PWMA, 0); // <-- CAMBIADO
+  ledcWrite(PWMB, 0); // <-- CAMBIADO
+  digitalWrite(AIN1, LOW);
+  digitalWrite(AIN2, LOW);
+  digitalWrite(BIN1, LOW);
+  digitalWrite(BIN2, LOW);
+}
+void Left() { 
+  ledcWrite(PWMA, currentSpeed); // <-- CAMBIADO
+  ledcWrite(PWMB, currentSpeed); // <-- CAMBIADO
+  digitalWrite(AIN1, LOW);
+  digitalWrite(AIN2, HIGH);
+  digitalWrite(BIN1, HIGH);
+  digitalWrite(BIN2, LOW);
+}
+void Right() { 
+  ledcWrite(PWMA, currentSpeed); // <-- CAMBIADO
+  ledcWrite(PWMB, currentSpeed); // <-- CAMBIADO
+  digitalWrite(AIN1, HIGH);
+  digitalWrite(AIN2, LOW);
+  digitalWrite(BIN1, LOW);
+  digitalWrite(BIN2, HIGH);
+}
+void ForwardLeft() { 
+  ledcWrite(PWMA, (int)(currentSpeed * turnFactor)); // <-- CAMBIADO
+  ledcWrite(PWMB, currentSpeed);                     // <-- CAMBIADO
+  digitalWrite(AIN1, HIGH);
+  digitalWrite(AIN2, LOW);
+  digitalWrite(BIN1, HIGH);
+  digitalWrite(BIN2, LOW);
+}
+void ForwardRight() { 
+  ledcWrite(PWMA, currentSpeed);                     // <-- CAMBIADO
+  ledcWrite(PWMB, (int)(currentSpeed * turnFactor)); // <-- CAMBIADO
+  digitalWrite(AIN1, HIGH);
+  digitalWrite(AIN2, LOW);
+  digitalWrite(BIN1, HIGH);
+  digitalWrite(BIN2, LOW);
+}
+void BackLeft() { 
+  ledcWrite(PWMA, (int)(currentSpeed * turnFactor)); // <-- CAMBIADO
+  ledcWrite(PWMB, currentSpeed);                     // <-- CAMBIADO
+  digitalWrite(AIN1, LOW);
+  digitalWrite(AIN2, HIGH);
+  digitalWrite(BIN1, LOW);
+  digitalWrite(BIN2, HIGH);
+}
+void BackRight() { 
+  ledcWrite(PWMA, currentSpeed);                     // <-- CAMBIADO
+  ledcWrite(PWMB, (int)(currentSpeed * turnFactor)); // <-- CAMBIADO
+  digitalWrite(AIN1, LOW);
+  digitalWrite(AIN2, HIGH);
+  digitalWrite(BIN1, LOW);
+  digitalWrite(BIN2, HIGH);
+}
